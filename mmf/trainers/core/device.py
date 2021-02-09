@@ -52,10 +52,22 @@ class TrainerDeviceMixin(ABC):
 
         if "cuda" in str(self.device) and self.distributed:
             registry.register("distributed", True)
-            self.model = torch.nn.parallel.DistributedDataParallel(
-                self.model,
-                device_ids=[self.local_rank],
-                output_device=self.local_rank,
-                check_reduction=True,
-                find_unused_parameters=self.config.training.find_unused_parameters,
-            )
+            set_torch_ddp = True
+            try:
+                from fairscale.optim.oss import OSS
+                from fairscale.nn.data_parallel import ShardedDataParallel
+
+                if isinstance(self.optimizer, OSS):
+                    self.model = ShardedDataParallel(self.model, self.optimizer)
+                    set_torch_ddp = False
+            except ImportError:
+                pass
+
+            if set_torch_ddp:
+                self.model = torch.nn.parallel.DistributedDataParallel(
+                    self.model,
+                    device_ids=[self.local_rank],
+                    output_device=self.local_rank,
+                    check_reduction=True,
+                    find_unused_parameters=self.config.training.find_unused_parameters,
+                )

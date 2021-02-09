@@ -117,7 +117,20 @@ class MMFTrainer(
             ), "Using fp16 requires torch version >- 1.6"
             assert self.device != torch.device("cpu"), "fp16 cannot be used on cpu"
 
-        self.scaler = torch.cuda.amp.GradScaler(enabled=self.training_config.fp16)
+        set_torch_grad_scaler = True
+        if self.training_config.fp16 and self.distributed:
+            try:
+                from fairscale.optim.oss import OSS
+                from fairscale.optim.grad_scaler import ShardedGradScaler
+
+                if isinstance(self.optimizer, OSS):
+                    self.scaler = ShardedGradScaler()
+                    set_torch_grad_scaler = False
+            except ImportError:
+                pass
+
+        if set_torch_grad_scaler:
+            self.scaler = torch.cuda.amp.GradScaler(enabled=self.training_config.fp16)
 
     def train(self):
         logger.info("===== Model =====")
