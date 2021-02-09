@@ -70,33 +70,43 @@ class TestShardedDDP(unittest.TestCase):
                 "training": {"find_unused_parameters": False},
             }
         )
+        self.trainer = None
 
     def tearDown(self):
         if torch.distributed.is_initialized():
             torch.distributed.destroy_process_group()
+        del self.trainer
 
     @skip_if_no_cuda
     @unittest.skipUnless(FAIRSCALE_AVAILABLE, "Tests for fairscale")
     def test_no_sharding(self):
-        trainer = MMFTrainerMock(self.config_no_oss, 100, 2, 0.04)
-        self.assertFalse(isinstance(trainer.optimizer, OSS))
-        self.assertFalse(isinstance(trainer.model, ShardedDataParallel))
+        self.trainer = MMFTrainerMock(self.config_no_oss, 100, 2, 0.04)
+
+        self.assertFalse(isinstance(self.trainer.optimizer, OSS))
+
+        self.assertFalse(isinstance(self.trainer.model, ShardedDataParallel))
         self.assertTrue(
-            isinstance(trainer.model, torch.nn.parallel.DistributedDataParallel)
+            isinstance(self.trainer.model, torch.nn.parallel.DistributedDataParallel)
         )
-        self.assertFalse(isinstance(trainer.scaler, ShardedGradScaler))
-        self.assertTrue(isinstance(trainer.scaler, torch.cuda.amp.GradScaler))
-        self.assertEqual(trainer.current_iteration, 0)
-        trainer.training_loop()
-        self.assertEqual(trainer.current_iteration, 4)
+
+        self.assertFalse(isinstance(self.trainer.scaler, ShardedGradScaler))
+        self.assertTrue(isinstance(self.trainer.scaler, torch.cuda.amp.GradScaler))
+
+        self.assertEqual(self.trainer.current_iteration, 0)
+        self.trainer.training_loop()
+        self.assertEqual(self.trainer.current_iteration, 4)
 
     @skip_if_no_cuda
     @unittest.skipUnless(FAIRSCALE_AVAILABLE, "Tests for fairscale")
     def test_sharding(self):
-        trainer = MMFTrainerMock(self.config_oss, 100, 2, 0.04)
-        self.assertTrue(isinstance(trainer.optimizer, OSS))
-        self.assertTrue(isinstance(trainer.model, ShardedDataParallel))
-        self.assertTrue(isinstance(trainer.scaler, ShardedGradScaler))
-        self.assertEqual(trainer.current_iteration, 0)
-        trainer.training_loop()
-        self.assertEqual(trainer.current_iteration, 4)
+        self.trainer = MMFTrainerMock(self.config_oss, 100, 2, 0.04)
+
+        self.assertTrue(isinstance(self.trainer.optimizer, OSS))
+
+        self.assertTrue(isinstance(self.trainer.model, ShardedDataParallel))
+
+        self.assertTrue(isinstance(self.trainer.scaler, ShardedGradScaler))
+
+        self.assertEqual(self.trainer.current_iteration, 0)
+        self.trainer.training_loop()
+        self.assertEqual(self.trainer.current_iteration, 4)
